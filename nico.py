@@ -1,0 +1,346 @@
+from concurrent.futures import ProcessPoolExecutor
+from pint import UnitRegistry
+from elektro.neuron.parse import build_and_zip_environment
+from koil import unkoil
+from elektro.api.schema import (
+    Experiment,
+    ModEnvironment,
+    RecordingViewInput,
+    StimulusViewInput,
+    acreate_experiment,
+    create_experiment,
+    create_mod_environment,
+    create_model_collection,
+    create_neuronmodel,
+    NeuronModel,
+    Simulation,
+    ModelConfigInput,
+    CellInput,
+    TopologyInput,
+    SectionInput,
+    ConnectionInput,
+)
+from arkitekt_next import easy
+from elektro.neuron.simulate import (
+    SineWaveStimulus,
+    WhiteNoiseStimulus,
+    arun_simulation,
+    VRecord,
+    CurrentClampStimulus,
+)
+from from_excel import load_biophysics_from_excel
+from kanne.units import mV, um, ms, pA, s, Hz
+
+# Owrite with cordless
+CELL_TOPOLOGY = TopologyInput(
+    sections=[
+        SectionInput(
+            category="soma",
+            id="soma",
+            nseg=25,
+            diam=30 * um,
+            length=30 * um,
+            connections=[],
+        ),
+        SectionInput(
+            category="dend",
+            id="dendrite",
+            nseg=10,
+            diam=1.0 * um,
+            length=120 * um,
+            connections=[ConnectionInput(parent="soma", location=0)],
+        ),
+        SectionInput(
+            category="dend",
+            id="apicalDend1",
+            nseg=10,
+            diam=1.0 * um,
+            length=120 * um,
+            connections=[ConnectionInput(parent="dendrite", location=1)],
+        ),
+        SectionInput(
+            category="dend",
+            id="apicalDend2",
+            nseg=10,
+            diam=1.0 * um,
+            length=120 * um,
+            connections=[ConnectionInput(parent="dendrite", location=1)],
+        ),
+        SectionInput(
+            category="dend",
+            id="apicalDend3",
+            nseg=10,
+            diam=1.0 * um,
+            length=120 * um,
+            connections=[ConnectionInput(parent="dendrite", location=1)],
+        ),
+        SectionInput(
+            category="dend",
+            id="basalDend1",
+            nseg=10,
+            diam=1.0 * um,
+            length=120 * um,
+            connections=[ConnectionInput(parent="soma", location=0.7)],
+        ),
+        SectionInput(
+            category="AIS_dist",
+            id="ais_dist",
+            nseg=40,
+            diam=1.22 * um,
+            length=30 * um,
+            connections=[ConnectionInput(parent="soma", location=1.0)],
+        ),
+        SectionInput(
+            category="axon",
+            id="distalAxon",
+            nseg=30,
+            diam=1.0 * um,
+            length=300 * um,
+            connections=[ConnectionInput(parent="ais_dist", location=1.0)],
+        ),
+    ]
+)
+
+CELL_BIO = load_biophysics_from_excel("biophysics_simple_fork_210330_v1.xlsx")
+
+
+def build_neuron_model(
+    environment: ModEnvironment,
+    ih_modifier: float,
+    ais_len: float,
+    synapse_count: int,
+    title: str,
+    description: str,
+) -> NeuronModel:
+    topo = CELL_TOPOLOGY.model_copy(deep=True)
+    topo.model_config["frozen"] = False
+    topo.model_config["validate_assignment"] = True
+    topo.get_section_for_id("ais_dist").length = ais_len * um
+
+    biophysics = CELL_BIO.model_copy(deep=True)
+
+    biophysics.model_config["frozen"] = False
+    biophysics.model_config["validate_assignment"] = True
+
+    biophysics.get_compartment_for_id("soma").get_section_param_for_id(
+        "gbar_hNa"
+    ).value = ih_modifier
+
+    biophysics.get_compartment_for_id("AIS_dist").get_section_param_for_id(
+        "gnabar_inaT"
+    ).value = 5
+    biophysics.get_compartment_for_id("AIS_dist").get_section_param_for_id(
+        "gkbar_ikdT"
+    ).value = 0.000001
+    biophysics.get_compartment_for_id("AIS_dist").get_section_param_for_id(
+        "gkbar_imZ"
+    ).value = 0.00001
+
+    for section in biophysics.compartments:
+        if section.global_params:
+            for param in section.global_params:
+                if param.param == "e_pas":
+                    pass
+                    # Set the resting potential to -70 mV
+                    param.value = -70.0
+
+    print(
+        biophysics.get_compartment_for_id("AIS_dist")
+        .get_section_param_for_id("gnabar_inaT")
+        .value
+    )
+
+    config = ModelConfigInput(
+        cells=[
+            CellInput(
+                id="cell_1",
+                biophysics=biophysics,
+                topology=topo,
+            )
+        ],
+        netSynapses=[],
+        netStimulators=[],
+        netConnections=[],
+        vInit=-70 * mV,
+        temperature="37 °C",
+    )
+
+    model = create_neuronmodel(
+        environment=environment,
+        name=title,
+        config=config,
+        description=description,
+    )
+    return model
+
+
+async def calculate_ih_sag_from_model(
+    model: NeuronModel,
+) -> Simulation:
+    """
+    Calculate the ih sag from the model.
+    """
+
+    process_pool = ProcessPoolExecutor(max_workers=8)
+
+    simulation = await arun_simulation(
+        model=model,
+        duration=1 * s,
+        records=[
+            VRecord(
+                cell="cell_1",
+                location="distalAxon",
+                position=0.5,
+            )
+        ],
+        stims=[
+            CurrentClampStimulus(
+                cell="cell_1",
+                location="soma",
+                position=0.5,
+                amp=100 * pA,
+                delay=100 * ms,
+            ),
+            WhiteNoiseStimulus(
+                cell="cell_1",
+                location="soma",
+                position=0.5,
+                noise_level=20 * pA,
+            ),
+            SineWaveStimulus(
+                cell="cell_1",
+                location="soma",
+                position=0.5,
+                amplitude=80 * pA,
+                frequency=200 * Hz,
+            ),
+        ],
+        dt=0.05 * ms,  # 20 kHz sampling
+        process_pool=process_pool,
+    )
+
+    # inspect(s)
+    return simulation
+
+
+async def calculate_from_aisless_from_model(
+    model: NeuronModel,
+) -> Simulation:
+    """
+    Calculate the ih sag from the model.
+    """
+
+    process_pool = ProcessPoolExecutor(max_workers=8)
+
+    simulation = await arun_simulation(
+        model=model,
+        duration=1 * s,
+        records=[
+            VRecord(
+                cell="cell_1",
+                location="distalAxon",
+                position=0.6,
+            )
+        ],
+        stims=[
+            CurrentClampStimulus(
+                cell="cell_1",
+                location="soma",
+                position=0.5,
+                amp=230 * pA,
+                delay=100 * ms,
+            ),
+            WhiteNoiseStimulus(
+                cell="cell_1",
+                location="soma",
+                position=0.5,
+                noise_level=20 * pA,
+            ),
+            SineWaveStimulus(
+                cell="cell_1",
+                location="soma",
+                position=0.5,
+                amplitude=80 * pA,
+                frequency=200 * Hz,
+            ),
+        ],
+        dt=0.05 * ms,  # 20 kHz sampling
+        process_pool=process_pool,
+    )
+
+    return simulation
+
+
+async def acombine(lists: list[Simulation], name="Combined Experiment") -> Experiment:
+    """
+    Combine two simulations into one.
+    """
+
+    combined = await acreate_experiment(
+        name=name,
+        description="Combined Experiment",
+        time_trace=lists[0].time_trace,
+        recording_views=[
+            RecordingViewInput(
+                recording=rec.id,
+                label=f"{sim.id} - {rec.location} ({rec.position})",
+            )
+            for sim in lists
+            for rec in sim.recordings
+        ],
+        stimulus_views=[
+            StimulusViewInput(
+                stimulus=rec.id,
+                label=f"{sim.id} - {rec.location} ({rec.position})",
+            )
+            for sim in lists
+            for rec in sim.stimuli
+        ],
+    )
+
+    return combined
+
+
+if __name__ == "__main__":
+    with easy("nico") as e:
+        # find_ih_modifier()
+
+        # Build the schema
+        zip_file, mechanisms_schema = build_and_zip_environment(
+            directory_path="models",
+        )
+        print("Zip file created at:", zip_file)
+
+        environment = create_mod_environment(
+            name="test_env", zip_file=zip_file, mechanisms=mechanisms_schema
+        )
+
+        model0 = build_neuron_model(
+            environment=environment,
+            ih_modifier=0.021,
+            ais_len=28.6,
+            synapse_count=4,
+            title="Normal AIS Model GG",
+            description="Model with normal AIS length",
+        )
+
+        answer1 = unkoil(calculate_ih_sag_from_model, model=model0)
+
+        print(answer1.stimuli[0].trace.data.compute())
+
+        model1 = build_neuron_model(
+            environment=environment,
+            ih_modifier=0.021,
+            ais_len=0.000001,
+            synapse_count=4,
+            title="Short AIS Model",
+            description="Model with very short AIS length",
+        )
+
+        create_model_collection(
+            models=[model0, model1], name="Short AIS Model Collection"
+        )
+
+        answer = unkoil(calculate_from_aisless_from_model, model=model1)
+
+        acombine([answer1, answer], name="AIS vs No AIS Experiment")

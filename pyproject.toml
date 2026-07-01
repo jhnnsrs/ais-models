@@ -1,0 +1,12 @@
+[project]
+name = "ais-models"
+version = "0.1.0"
+description = "Add your description here"
+readme = "README.md"
+requires-python = ">=3.12"
+dependencies = [
+    "arkitekt-next[elektro]>=1.2",
+    "elektro>=1.2.2",
+    "neuron>=9.0.1",
+    "openpyxl>=3.1.5",
+]
