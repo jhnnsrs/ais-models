@@ -164,7 +164,7 @@ async def sweep_amplitudes(
             dt=0.05 * ms,  # 20 kHz sampling
             process_pool=process_pool,
         )
-        rate = count_firing_rate(sim.time_trace, sim.recordings[0].trace.value)
+        rate = count_firing_rate(sim.time_trace.data, sim.recordings[0].trace.value)
         results.append((amp, rate))
         print(f"  {amp:6.1f} pA -> {rate:5.2f} Hz")
     return results
@@ -397,6 +397,9 @@ if __name__ == "__main__":
             title="Normal AIS 4-5 Hz",
             description="Normal AIS cell tuned just above rheobase for 4-5 Hz tonic firing",
         )
+
+        print(model_ais)
+
         model_no_ais = build_neuron_model(
             environment=environment,
             ih_modifier=0.001,
@@ -421,7 +424,9 @@ if __name__ == "__main__":
         )
 
         # Combine both 10 s runs into a single comparison experiment.
-        experiment = combine([sim_ais, sim_no_ais], name="AIS vs No-AIS @ 4-5 Hz")
+        experiment = unkoil(
+            acombine, [sim_ais, sim_no_ais], name="AIS vs No-AIS @ 4-5 Hz"
+        )
         print("Published comparison experiment:", experiment.id)
 
         # Export all traces locally as a zip, one base folder per labeled model.

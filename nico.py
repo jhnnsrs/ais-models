@@ -40,7 +40,9 @@ CELL_TOPOLOGY = TopologyInput(
             nseg=25,
             diam=30 * um,
             length=30 * um,
-            connections=[],
+            # Soma is the one section with cm != 1 in the biophysics sheet.
+            cm="1.1 uF/cm^2",
+            parent=None,
         ),
         SectionInput(
             category="dend",
@@ -48,7 +50,7 @@ CELL_TOPOLOGY = TopologyInput(
             nseg=10,
             diam=1.0 * um,
             length=120 * um,
-            connections=[ConnectionInput(parent="soma", location=0)],
+            parent=ConnectionInput(parent="soma", parent_location=0),
         ),
         SectionInput(
             category="dend",
@@ -56,7 +58,7 @@ CELL_TOPOLOGY = TopologyInput(
             nseg=10,
             diam=1.0 * um,
             length=120 * um,
-            connections=[ConnectionInput(parent="dendrite", location=1)],
+            parent=ConnectionInput(parent="dendrite", parent_location=1),
         ),
         SectionInput(
             category="dend",
@@ -64,7 +66,7 @@ CELL_TOPOLOGY = TopologyInput(
             nseg=10,
             diam=1.0 * um,
             length=120 * um,
-            connections=[ConnectionInput(parent="dendrite", location=1)],
+            parent=ConnectionInput(parent="dendrite", parent_location=1),
         ),
         SectionInput(
             category="dend",
@@ -72,7 +74,7 @@ CELL_TOPOLOGY = TopologyInput(
             nseg=10,
             diam=1.0 * um,
             length=120 * um,
-            connections=[ConnectionInput(parent="dendrite", location=1)],
+            parent=ConnectionInput(parent="dendrite", parent_location=1),
         ),
         SectionInput(
             category="dend",
@@ -80,7 +82,7 @@ CELL_TOPOLOGY = TopologyInput(
             nseg=10,
             diam=1.0 * um,
             length=120 * um,
-            connections=[ConnectionInput(parent="soma", location=0.7)],
+            parent=ConnectionInput(parent="soma", parent_location=0.7),
         ),
         SectionInput(
             category="AIS_dist",
@@ -88,7 +90,7 @@ CELL_TOPOLOGY = TopologyInput(
             nseg=40,
             diam=1.22 * um,
             length=30 * um,
-            connections=[ConnectionInput(parent="soma", location=1.0)],
+            parent=ConnectionInput(parent="soma", parent_location=1.0),
         ),
         SectionInput(
             category="axon",
@@ -96,7 +98,7 @@ CELL_TOPOLOGY = TopologyInput(
             nseg=30,
             diam=1.0 * um,
             length=300 * um,
-            connections=[ConnectionInput(parent="ais_dist", location=1.0)],
+            parent=ConnectionInput(parent="ais_dist", parent_location=1.0),
         ),
     ]
 )
@@ -122,32 +124,28 @@ def build_neuron_model(
     biophysics.model_config["frozen"] = False
     biophysics.model_config["validate_assignment"] = True
 
+    # These are unit-bearing quantities (validated against the mod environment),
+    # so overrides have to carry the mechanism's NEURON unit — see
+    # SECTION_PARAM_UNITS in from_excel.py. hNa's gbar is in mS/cm2; the inaT/ikdT/
+    # imZ conductances are in S/cm2.
     biophysics.get_compartment_for_id("soma").get_section_param_for_id(
         "gbar_hNa"
-    ).value = ih_modifier
+    ).distribution.value = f"{ih_modifier} mS/cm2"
 
     biophysics.get_compartment_for_id("AIS_dist").get_section_param_for_id(
         "gnabar_inaT"
-    ).value = 5
+    ).distribution.value = "5 S/cm2"
     biophysics.get_compartment_for_id("AIS_dist").get_section_param_for_id(
         "gkbar_ikdT"
-    ).value = 0.000001
+    ).distribution.value = "0.000001 S/cm2"
     biophysics.get_compartment_for_id("AIS_dist").get_section_param_for_id(
         "gkbar_imZ"
-    ).value = 0.00001
-
-    for section in biophysics.compartments:
-        if section.global_params:
-            for param in section.global_params:
-                if param.param == "e_pas":
-                    pass
-                    # Set the resting potential to -70 mV
-                    param.value = -70.0
+    ).distribution.value = "0.00001 S/cm2"
 
     print(
         biophysics.get_compartment_for_id("AIS_dist")
         .get_section_param_for_id("gnabar_inaT")
-        .value
+        .distribution.value
     )
 
     config = ModelConfigInput(
@@ -161,6 +159,9 @@ def build_neuron_model(
         netSynapses=[],
         netStimulators=[],
         netConnections=[],
+        # Axial resistivity (former per-compartment "Ra" global, uniform at
+        # 200 Ω·cm in the sheet) is now a model-wide cable default.
+        ra="200 ohm*cm",
         vInit=-70 * mV,
         temperature="37 °C",
     )
