@@ -26,7 +26,7 @@ from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 from koil import unkoil
-from arkitekt_next import easy
+from arkitekt import easy
 
 from elektro.neuron.parse import build_and_zip_environment
 from elektro.api.schema import (

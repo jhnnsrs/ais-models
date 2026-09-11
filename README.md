@@ -43,7 +43,7 @@ ais-models/
 │                            #   "mod environment" the server validates against.
 ├── pyproject.toml           # Project + dependencies (managed by uv).
 ├── uv.lock                  # Locked dependency versions.
-├── .arkitekt_next/          # Arkitekt deployment config (manifest, flavours, builds).
+├── .arkitekt/          # Arkitekt deployment config (manifest, flavours, builds).
 └── .devcontainer/           # VS Code devcontainer built from the Arkitekt flavour.
 ```
 
@@ -95,7 +95,7 @@ biophysics_simple_fork_210330_v1.xlsx
   publish models/simulations to it. Without one, the `__main__` blocks will not
   complete.
 
-Core dependencies (`pyproject.toml`): `arkitekt-next[elektro]`, `elektro`,
+Core dependencies (`pyproject.toml`): `arkitekt[elektro]`, `elektro`,
 `neuron`, `openpyxl` (plus `pandas`, `numpy`, `pint`/`kanne` for units).
 
 ---
@@ -151,7 +151,7 @@ script tunes the *mean* rate rather than an exact spike count:
 
 ## Deployment (Arkitekt)
 
-`.arkitekt_next/manifest.yaml` declares this as an Arkitekt app
+`.arkitekt/manifest.yaml` declares this as an Arkitekt app
 (`identifier: ais-models`, `entrypoint: nico_4_5hz`, package manager `uv`). The
 `flavours/vanilla/` Dockerfile builds a `python:3.12-slim` image with `uv sync`.
 See the [Arkitekt docs](https://arkitekt.live) for building and deploying

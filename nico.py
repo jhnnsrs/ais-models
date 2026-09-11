@@ -20,7 +20,7 @@ from elektro.api.schema import (
     SectionInput,
     ConnectionInput,
 )
-from arkitekt_next import easy
+from arkitekt import easy
 from elektro.neuron.simulate import (
     SineWaveStimulus,
     WhiteNoiseStimulus,
