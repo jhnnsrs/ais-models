@@ -344,4 +344,4 @@ if __name__ == "__main__":
 
         answer = unkoil(calculate_from_aisless_from_model, model=model1)
 
-        acombine([answer1, answer], name="AIS vs No AIS Experiment")
+        unkoil(acombine, [answer1, answer], name="AIS vs No AIS Experiment")
