@@ -43,8 +43,7 @@ ais-models/
 │                            #   "mod environment" the server validates against.
 ├── pyproject.toml           # Project + dependencies (managed by uv).
 ├── uv.lock                  # Locked dependency versions.
-├── .arkitekt/          # Arkitekt deployment config (manifest, flavours, builds).
-└── .devcontainer/           # VS Code devcontainer built from the Arkitekt flavour.
+└── .arkitekt/                # Local Arkitekt app folder (git-/docker-ignored credentials).
 ```
 
 ### How the pieces fit together
@@ -57,7 +56,7 @@ biophysics_simple_fork_210330_v1.xlsx
                           ├──►  build_neuron_model()  ──►  NeuronModel  ──►  simulate
    CELL_TOPOLOGY  ────────┘         (nico.py)                                   │
    (soma, dends, AIS, axon)                                                     ▼
-   models/*.mod  ──► build_and_zip_environment() ──► ModEnvironment      Simulation / Experiment
+   models/*.mod  ──► build_and_zip_environment() ──► ModEnvironment    PublishedRun / Experiment
 ```
 
 ---
@@ -82,8 +81,16 @@ biophysics_simple_fork_210330_v1.xlsx
   against.
 
 - **Arkitekt / elektro**: models, environments, simulations and experiments are
-  all created on an Arkitekt server through the `elektro` schema. The
-  `with easy("nico") as e:` block establishes that connection.
+  all created on an Arkitekt server through an `Elektro` client. The
+  `with easy("nico", elektro_service) as elektro:` block connects and hands back
+  that client, which is passed explicitly to every helper (`build_neuron_model`,
+  `arun_simulation`, `acombine`, ...).
+
+- **Runs and experiments** (elektro 4): `arun_simulation` publishes a run as one
+  `ArrayDataset` per recording/stimulus, timed onto a new clock, and returns a
+  `PublishedRun` (`clock`, `recordings`, `stimuli`). `acombine` builds one
+  experiment on the first run's clock, places the other runs' clocks onto it at
+  0 s, and adds a trace layer per dataset.
 
 ---
 
@@ -91,12 +98,12 @@ biophysics_simple_fork_210330_v1.xlsx
 
 - **Python 3.12** (see `.python-version`).
 - [**uv**](https://docs.astral.sh/uv/) for dependency management.
-- A reachable **Arkitekt server** — the scripts connect via `easy("nico")` and
+- A reachable **Arkitekt server** — the scripts connect via `easy("nico", elektro_service)` and
   publish models/simulations to it. Without one, the `__main__` blocks will not
   complete.
 
-Core dependencies (`pyproject.toml`): `arkitekt[elektro]`, `elektro`,
-`neuron`, `openpyxl` (plus `pandas`, `numpy`, `pint`/`kanne` for units).
+Core dependencies (`pyproject.toml`): `arkitekt[elektro]>=5`, `elektro[neuron]>=4.2`,
+`neuron`, `openpyxl`, `pandas`, `koil`, `kanne` (units).
 
 ---
 
@@ -109,9 +116,6 @@ uv sync
 # (optional) activate the environment
 source .venv/bin/activate
 ```
-
-A VS Code **devcontainer** is provided under `.devcontainer/` (built from the
-Arkitekt "vanilla" flavour) if you prefer a containerized setup.
 
 ---
 
@@ -151,11 +155,10 @@ script tunes the *mean* rate rather than an exact spike count:
 
 ## Deployment (Arkitekt)
 
-`.arkitekt/manifest.yaml` declares this as an Arkitekt app
-(`identifier: ais-models`, `entrypoint: nico_4_5hz`, package manager `uv`). The
-`flavours/vanilla/` Dockerfile builds a `python:3.12-slim` image with `uv sync`.
-See the [Arkitekt docs](https://arkitekt.live) for building and deploying
-flavours.
+The scripts are standalone `easy()` clients, not an Arkitekt plugin app. Current
+`arkitekt` has no manifest: to package this as a plugin, declare an `App(...)` in
+a module and use `arkitekt plugin init` / `arkitekt plugin build <module>:app`.
+See the [Arkitekt docs](https://arkitekt.live).
 
 ---
 

@@ -1,7 +1,0 @@
-author: jhnnsrs
-entrypoint: nico_4_5hz
-identifier: ais-models
-package_manager: uv
-scopes:
-- read
-version: 0.0.1

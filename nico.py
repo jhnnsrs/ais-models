@@ -1,19 +1,11 @@
 from concurrent.futures import ProcessPoolExecutor
-from pint import UnitRegistry
+from elektro import Elektro, elektro_service
 from elektro.neuron.parse import build_and_zip_environment
 from koil import unkoil
 from elektro.api.schema import (
     Experiment,
     ModEnvironment,
-    RecordingViewInput,
-    StimulusViewInput,
-    acreate_experiment,
-    create_experiment,
-    create_mod_environment,
-    create_model_collection,
-    create_neuronmodel,
     NeuronModel,
-    Simulation,
     ModelConfigInput,
     CellInput,
     TopologyInput,
@@ -22,6 +14,7 @@ from elektro.api.schema import (
 )
 from arkitekt import easy
 from elektro.neuron.simulate import (
+    PublishedRun,
     SineWaveStimulus,
     WhiteNoiseStimulus,
     arun_simulation,
@@ -107,6 +100,7 @@ CELL_BIO = load_biophysics_from_excel("biophysics_simple_fork_210330_v1.xlsx")
 
 
 def build_neuron_model(
+    elektro: Elektro,
     environment: ModEnvironment,
     ih_modifier: float,
     ais_len: float,
@@ -166,7 +160,7 @@ def build_neuron_model(
         temperature="37 °C",
     )
 
-    model = create_neuronmodel(
+    model = elektro.create_neuronmodel(
         environment=environment,
         name=title,
         config=config,
@@ -176,8 +170,9 @@ def build_neuron_model(
 
 
 async def calculate_ih_sag_from_model(
+    elektro: Elektro,
     model: NeuronModel,
-) -> Simulation:
+) -> PublishedRun:
     """
     Calculate the ih sag from the model.
     """
@@ -185,6 +180,7 @@ async def calculate_ih_sag_from_model(
     process_pool = ProcessPoolExecutor(max_workers=8)
 
     simulation = await arun_simulation(
+        elektro,
         model=model,
         duration=1 * s,
         records=[
@@ -225,8 +221,9 @@ async def calculate_ih_sag_from_model(
 
 
 async def calculate_from_aisless_from_model(
+    elektro: Elektro,
     model: NeuronModel,
-) -> Simulation:
+) -> PublishedRun:
     """
     Calculate the ih sag from the model.
     """
@@ -234,6 +231,7 @@ async def calculate_from_aisless_from_model(
     process_pool = ProcessPoolExecutor(max_workers=8)
 
     simulation = await arun_simulation(
+        elektro,
         model=model,
         duration=1 * s,
         records=[
@@ -272,38 +270,40 @@ async def calculate_from_aisless_from_model(
     return simulation
 
 
-async def acombine(lists: list[Simulation], name="Combined Experiment") -> Experiment:
+async def acombine(
+    elektro: Elektro, runs: list[PublishedRun], name="Combined Experiment"
+) -> Experiment:
     """
-    Combine two simulations into one.
+    Combine several published runs into one experiment, overlaid on a shared clock.
+
+    Every run is published on its own clock starting at t=0, so the experiment
+    adopts the first run's clock as its world and every other run's clock is
+    placed onto it with no offset. Each recording and stimulus becomes a trace layer.
     """
 
-    combined = await acreate_experiment(
+    world = runs[0].clock
+    combined = await elektro.acreate_experiment(
         name=name,
         description="Combined Experiment",
-        time_trace=lists[0].time_trace,
-        recording_views=[
-            RecordingViewInput(
-                recording=rec.id,
-                label=f"{sim.id} - {rec.location} ({rec.position})",
-            )
-            for sim in lists
-            for rec in sim.recordings
-        ],
-        stimulus_views=[
-            StimulusViewInput(
-                stimulus=rec.id,
-                label=f"{sim.id} - {rec.location} ({rec.position})",
-            )
-            for sim in lists
-            for rec in sim.stimuli
-        ],
+        coordinate_system=world.id,
     )
+
+    for run in runs[1:]:
+        await elektro.acreate_clock_offset(
+            clock=run.clock.id, onto=world.id, offset=0 * s, drift_ppm=0.0
+        )
+
+    for run in runs:
+        for dataset in run.datasets:
+            await elektro.acreate_trace_layer(
+                experiment=combined.id, dataset=dataset.id, name=dataset.name
+            )
 
     return combined
 
 
 if __name__ == "__main__":
-    with easy("nico") as e:
+    with easy("nico", elektro_service) as elektro:
         # find_ih_modifier()
 
         # Build the schema
@@ -312,11 +312,12 @@ if __name__ == "__main__":
         )
         print("Zip file created at:", zip_file)
 
-        environment = create_mod_environment(
+        environment = elektro.create_mod_environment(
             name="test_env", zip_file=zip_file, mechanisms=mechanisms_schema
         )
 
         model0 = build_neuron_model(
+            elektro,
             environment=environment,
             ih_modifier=0.021,
             ais_len=28.6,
@@ -325,11 +326,12 @@ if __name__ == "__main__":
             description="Model with normal AIS length",
         )
 
-        answer1 = unkoil(calculate_ih_sag_from_model, model=model0)
+        answer1 = unkoil(calculate_ih_sag_from_model, elektro, model=model0)
 
-        print(answer1.stimuli[0].trace.data.compute())
+        print(answer1.stimuli[0].data.compute())
 
         model1 = build_neuron_model(
+            elektro,
             environment=environment,
             ih_modifier=0.021,
             ais_len=0.000001,
@@ -338,10 +340,10 @@ if __name__ == "__main__":
             description="Model with very short AIS length",
         )
 
-        create_model_collection(
+        elektro.create_model_collection(
             models=[model0, model1], name="Short AIS Model Collection"
         )
 
-        answer = unkoil(calculate_from_aisless_from_model, model=model1)
+        answer = unkoil(calculate_from_aisless_from_model, elektro, model=model1)
 
-        unkoil(acombine, [answer1, answer], name="AIS vs No AIS Experiment")
+        unkoil(acombine, elektro, [answer1, answer], name="AIS vs No AIS Experiment")

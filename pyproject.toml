@@ -5,8 +5,11 @@ description = "Add your description here"
 readme = "README.md"
 requires-python = ">=3.12"
 dependencies = [
-    "arkitekt[elektro]>=2",
-    "elektro>=2.0",
+    "arkitekt[elektro]>=5",
+    "elektro[neuron]>=4.2",
+    "kanne>=2.6.0",
+    "koil>=3.3.5",
     "neuron>=9.0.1",
     "openpyxl>=3.1.5",
+    "pandas>=3.0.6",
 ]
