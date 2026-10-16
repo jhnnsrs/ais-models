@@ -149,7 +149,7 @@ dependencies = [
 [package.metadata]
 requires-dist = [
     { name = "arkitekt", extras = ["elektro"], specifier = ">=5" },
-    { name = "elektro", extras = ["neuron"], specifier = ">=4.2" },
+    { name = "elektro", extras = ["neuron"], specifier = ">=4.2.1" },
     { name = "kanne", specifier = ">=2.6.0" },
     { name = "koil", specifier = ">=3.3.5" },
     { name = "neuron", specifier = ">=9.0.1" },
@@ -450,7 +450,7 @@ wheels = [
 
 [[package]]
 name = "elektro"
-version = "4.2.0"
+version = "4.2.1"
 source = { registry = "https://pypi.org/simple" }
 dependencies = [
     { name = "arkitekt-spec" },
@@ -468,9 +468,9 @@ dependencies = [
     { name = "xarray" },
     { name = "zarr" },
 ]
-sdist = { url = "https://files.pythonhosted.org/packages/4d/e0/d1a2e582d987fd5e571b338428916ddd273a2b22cb216ed56fe13193f64e/elektro-4.2.0.tar.gz", hash = "sha256:bfd655775685d8491a8e4b5d960ae8bdcddad3cac63baaeb481f8a2b6ddd3803", size = 297774, upload-time = "2026-09-29T09:26:09.563Z" }
+sdist = { url = "https://files.pythonhosted.org/packages/a3/fd/5d870185042212bcb61e534f5dabb041ba6552322a6349b85985f1d7d645/elektro-4.2.1.tar.gz", hash = "sha256:16b9e3fcdbb1920a6e6054d950dc31a52f46ed913e478399768e7141f537afe4", size = 300003, upload-time = "2026-09-30T13:17:35.004Z" }
 wheels = [
-    { url = "https://files.pythonhosted.org/packages/b6/c5/7240a165822eccfdc0ad106c6b56c11e922e78b131cb8b6549804b09a40c/elektro-4.2.0-py3-none-any.whl", hash = "sha256:d63459570993b58ad598d829d888ada2f530dbfc2969f59d3406fa5d74b47b5a", size = 311545, upload-time = "2026-09-29T09:26:08.239Z" },
+    { url = "https://files.pythonhosted.org/packages/d9/cf/a7564b46b9cc40a57965f7bfcac1b066da0971b72de46ed3a034c3383231/elektro-4.2.1-py3-none-any.whl", hash = "sha256:2f4974bea8a0f0869d9aaf18cdda7cdffd1360f5d13a24a90ba5487ee3bc8d7d", size = 313917, upload-time = "2026-09-30T13:17:33.881Z" },
 ]
 
 [package.optional-dependencies]
