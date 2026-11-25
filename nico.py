@@ -1,5 +1,5 @@
 from concurrent.futures import ProcessPoolExecutor
-from elektro import Elektro, elektro_service
+from elektro import Elektro
 from elektro.neuron.parse import build_and_zip_environment
 from koil import unkoil
 from elektro.api.schema import (
@@ -12,7 +12,7 @@ from elektro.api.schema import (
     SectionInput,
     ConnectionInput,
 )
-from arkitekt import easy
+from arkitekt import connect
 from elektro.neuron.simulate import (
     PublishedRun,
     SineWaveStimulus,
@@ -303,7 +303,7 @@ async def acombine(
 
 
 if __name__ == "__main__":
-    with easy("nico", elektro_service) as elektro:
+    with connect(Elektro, identifier="nico") as elektro:
         # find_ih_modifier()
 
         # Build the schema

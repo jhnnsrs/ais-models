@@ -26,9 +26,9 @@ from concurrent.futures import ProcessPoolExecutor
 
 import numpy as np
 from koil import unkoil
-from arkitekt import easy
+from arkitekt import connect
 
-from elektro import Elektro, elektro_service
+from elektro import Elektro
 from elektro.neuron.parse import build_and_zip_environment
 from elektro.api.schema import ArrayDataset, NeuronModel
 from elektro.neuron.simulate import (
@@ -410,7 +410,7 @@ def export_simulations_to_zip(
 
 
 if __name__ == "__main__":
-    with easy("nico", elektro_service) as elektro:
+    with connect(Elektro, identifier="nico") as elektro:
         # Build and register the mechanism environment.
         zip_file, mechanisms_schema = build_and_zip_environment(
             directory_path="models",

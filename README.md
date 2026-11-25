@@ -82,7 +82,7 @@ biophysics_simple_fork_210330_v1.xlsx
 
 - **Arkitekt / elektro**: models, environments, simulations and experiments are
   all created on an Arkitekt server through an `Elektro` client. The
-  `with easy("nico", elektro_service) as elektro:` block connects and hands back
+  `with connect(Elektro, identifier="nico") as elektro:` block connects and hands back
   that client, which is passed explicitly to every helper (`build_neuron_model`,
   `arun_simulation`, `acombine`, ...).
 
@@ -98,7 +98,7 @@ biophysics_simple_fork_210330_v1.xlsx
 
 - **Python 3.12** (see `.python-version`).
 - [**uv**](https://docs.astral.sh/uv/) for dependency management.
-- A reachable **Arkitekt server** — the scripts connect via `easy("nico", elektro_service)` and
+- A reachable **Arkitekt server** — the scripts log in via `connect(Elektro, identifier="nico")` and
   publish models/simulations to it. Without one, the `__main__` blocks will not
   complete.
 
@@ -155,7 +155,7 @@ script tunes the *mean* rate rather than an exact spike count:
 
 ## Deployment (Arkitekt)
 
-The scripts are standalone `easy()` clients, not an Arkitekt plugin app. Current
+The scripts are standalone `connect(Elektro)` scripts, not an Arkitekt plugin app. Current
 `arkitekt` has no manifest: to package this as a plugin, declare an `App(...)` in
 a module and use `arkitekt plugin init` / `arkitekt plugin build <module>:app`.
 See the [Arkitekt docs](https://arkitekt.live).
